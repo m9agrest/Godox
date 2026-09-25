@@ -59,6 +59,32 @@ try
     Check(MixerMath.Effective(50, 1) == 1 && MixerMath.Effective(0, 100) == 0 && MixerMath.Effective(100, 100) == 100, "Rounding and boundaries");
     try { manager.SetMixer("a", 101); throw new Exception("Accepted invalid level"); } catch (ArgumentException) { }
     Check(manager.Profile("a").MixerLevel == 30, "Invalid level cannot alter saved settings");
+    await manager.DisconnectAll();
+    backend.BlockConnection();
+    var connection = manager.Act("a", "connect"); await backend.ConnectEntered.Task;
+    var item = new MixerItem(manager.Snapshot().First(d => d.Profile.Id == "a"));
+    Check(!item.CanConnect && item.ConnectText == "Подключается…", "Manual connection disables the button before BLE completes");
+    try { await manager.Act("a", "connect"); throw new Exception("Duplicate connection accepted"); }
+    catch (InvalidOperationException) { }
+    Check(backend.ConnectCalls == 1 && manager.Snapshot().First(d => d.Profile.Id == "a").Connecting, "Duplicate request cannot queue a second BLE connection or clear progress");
+    var queued = manager.Act("b", "connect");
+    Check(manager.Snapshot().First(d => d.Profile.Id == "b").Connecting, "Queued connection also disables its button while waiting for BLE");
+    backend.ConnectRelease.SetResult(); var completed = await connection; await queued;
+    item.Update(manager.Snapshot().First(d => d.Profile.Id == "a"));
+    Check(item.CanConnect && item.ConnectText == "Отключить" && !completed.Connecting, "Successful connection restores enabled disconnect button");
+    await manager.DisconnectAll(); manager.SetAutoConnect(null, true);
+    backend.BlockConnection(fail: true);
+    var automatic = manager.AutoConnect(); await backend.ConnectEntered.Task;
+    Check(manager.Snapshot().First(d => d.Profile.Id == "a").Connecting, "Automatic connection exposes the same pending state");
+    backend.ConnectRelease.SetResult(); await automatic;
+    item.Update(manager.Snapshot().First(d => d.Profile.Id == "a"));
+    Check(item.CanConnect && item.ConnectText == "Подключить" && item.Warning.Length > 0, "Failed connection clears progress and allows manual retry");
+    await manager.Act("a", "connect");
+    Check(manager.Snapshot().First(d => d.Profile.Id == "a").Status.Connected, "Manual retry succeeds after a failed automatic connection");
+    manager.SetCloseToTray(true);
+    Check(store.Load().CloseToTray, "Close-to-tray setting survives reload");
+    manager.SetCloseToTray(false);
+    Check(!store.Load().CloseToTray, "Close-to-tray can be disabled persistently");
     manager.Stop();
 }
 finally
@@ -73,11 +99,30 @@ sealed class FakeBackend : IBackend
     public bool BlockNextWrite;
     public TaskCompletionSource Entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public TaskCompletionSource Release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public TaskCompletionSource ConnectEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public TaskCompletionSource ConnectRelease = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public int ConnectCalls;
+    private bool blockConnection, failConnection;
+    public void BlockConnection(bool fail = false)
+    {
+        blockConnection = true; failConnection = fail; ConnectCalls = 0;
+        ConnectEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        ConnectRelease = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
     public async Task<JsonElement> SendAsync(string command, DeviceProfile? device = null, int? brightness = null, int? cct = null)
     {
         if (command == "sessions") return JsonSerializer.SerializeToElement(States, SettingsStore.Json);
         var id = device!.Id;
-        if (command == "connect") States[id] = new(true, 0, 6500);
+        if (command == "connect")
+        {
+            ConnectCalls++;
+            if (blockConnection)
+            {
+                blockConnection = false; ConnectEntered.SetResult(); await ConnectRelease.Task;
+                if (failConnection) { failConnection = false; throw new IOException("Test connection failure"); }
+            }
+            States[id] = new(true, 0, 6500);
+        }
         if (command == "disconnect") States[id] = new();
         if (command == "set_fast")
         {

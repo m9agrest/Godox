@@ -12,6 +12,9 @@ public partial class MainWindow : Window
     private readonly SettingsStore store;
     private readonly DeviceManager manager;
     private readonly LocalApi api;
+    private readonly WindowsStartup startup;
+    private TrayIcon? tray;
+    private bool exitRequested;
     private readonly ObservableCollection<MixerItem> items = [];
     private Hotkeys? hotkeys;
     private bool closing, closed, syncing = true;
@@ -53,12 +56,32 @@ public partial class MainWindow : Window
         Directory.CreateDirectory(Path.Combine(store.DataDirectory, "artifacts"));
         File.WriteAllText(Path.Combine(store.DataDirectory, "artifacts", "mixer-values.json"), System.Text.Json.JsonSerializer.Serialize(visualValues));
         if (visualValues.Any(v => v.value != v.level)) throw new InvalidOperationException("Visual slider does not match its saved level after reorder.");
+        static IEnumerable<Button> Buttons(DependencyObject parent)
+        {
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is Button button) yield return button;
+                foreach (var nested in Buttons(child)) yield return nested;
+            }
+        }
+        var original = first.View;
+        first.Update(original with { Connecting = true });
+        await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+        var connectionButton = Buttons(Devices).First(b => ReferenceEquals(b.DataContext, first) && (string?)b.Content == "Подключается…");
+        if (connectionButton.IsEnabled) throw new InvalidOperationException("Connecting button is still enabled.");
+        first.Update(original);
+        await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+        if (!connectionButton.IsEnabled || (string?)connectionButton.Content != "Подключить")
+            throw new InvalidOperationException("Connection button did not recover after pending state.");
         manager.Log("PASS: UI slider events, master proportions, stable controls, and reorder.");
     }
-    public MainWindow(SettingsStore store, DeviceManager manager, LocalApi api)
+    public MainWindow(SettingsStore store, DeviceManager manager, LocalApi api, WindowsStartup startup)
     {
-        this.store = store; this.manager = manager; this.api = api;
+        this.store = store; this.manager = manager; this.api = api; this.startup = startup;
         InitializeComponent(); Devices.ItemsSource = items;
+        StartupEnabled.IsChecked = startup.Enabled;
+        CloseToTrayEnabled.IsChecked = manager.Settings.CloseToTray;
         HotkeysEnabled.IsChecked = manager.Settings.HotkeysEnabled;
         ApiEnabled.IsChecked = manager.Settings.ApiEnabled;
         ApiPort.Text = manager.Settings.ApiPort.ToString(); ApiStatus.Text = api.Status;
@@ -68,8 +91,73 @@ public partial class MainWindow : Window
             if (LogBox.Text.Length > 50000) LogBox.Text = LogBox.Text[^30000..];
             LogBox.AppendText(line + Environment.NewLine); LogBox.ScrollToEnd();
         });
-        Loaded += (_, _) => { hotkeys = new Hotkeys(this, manager); ApplyHotkeys(); };
+        Loaded += (_, _) => {
+            if (hotkeys is null) { hotkeys = new Hotkeys(this, manager); ApplyHotkeys(); }
+            if (tray is null)
+                try { tray = new TrayIcon(this); }
+                catch (Exception exc) { manager.Log("Значок трея недоступен: " + exc.Message); }
+        };
         RefreshDevices();
+    }
+    public void RestoreFromTray()
+    {
+        if (closing || closed) return;
+        Show();
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Activate();
+    }
+    public void ExitApplication() { exitRequested = true; Close(); }
+    public void DisposeTray() { tray?.Dispose(); tray = null; }
+    internal void HideForStartup() { if (manager.Settings.CloseToTray && tray is not null) Hide(); }
+    private void ExitClicked(object sender, RoutedEventArgs e) => ExitApplication();
+    private void StartupChanged(object sender, RoutedEventArgs e)
+    {
+        Change(() => startup.SetEnabled(StartupEnabled.IsChecked == true));
+        StartupEnabled.IsChecked = startup.Enabled;
+    }
+    private void CloseToTrayChanged(object sender, RoutedEventArgs e)
+    {
+        Change(() => manager.SetCloseToTray(CloseToTrayEnabled.IsChecked == true));
+        CloseToTrayEnabled.IsChecked = manager.Settings.CloseToTray;
+    }
+    internal async Task ProbeDesktop()
+    {
+        if (store.DataDirectory == SettingsStore.DefaultDataDirectory || manager.Settings.AutoConnectEnabled)
+            throw new InvalidOperationException("Desktop smoke requires isolated data and auto-connect off.");
+        var previous = manager.Settings.CloseToTray;
+        manager.SetCloseToTray(true);
+        Close();
+        await Task.Delay(200);
+        if (IsVisible || closing || tray is null) throw new InvalidOperationException("Closing did not keep the application in the tray.");
+        bool hiddenHotkey = false;
+        void ObserveHotkey(string line) { if (line.Contains("Хоткей:")) hiddenHotkey = true; }
+        manager.Logged += ObserveHotkey;
+        try
+        {
+            ProbeHotkey();
+            for (int i = 0; i < 20 && !hiddenHotkey; i++) await Task.Delay(50);
+            if (manager.Settings.HotkeysEnabled && items.Count > 0 && !hiddenHotkey)
+                throw new InvalidOperationException("Hidden window no longer receives hotkey messages.");
+        }
+        finally { manager.Logged -= ObserveHotkey; }
+        if (manager.Settings.ApiEnabled)
+        {
+            using var http = new System.Net.Http.HttpClient();
+            using var response = await http.GetAsync(api.Status + "/health");
+            response.EnsureSuccessStatusCode();
+        }
+        var activation = new System.Diagnostics.ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false, CreateNoWindow = true };
+        foreach (var argument in new[] { "--root", store.Root, "--data-dir", store.DataDirectory }) activation.ArgumentList.Add(argument);
+        using var second = System.Diagnostics.Process.Start(activation)!;
+        await second.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        await Task.Delay(200);
+        if (!IsVisible || closing) throw new InvalidOperationException("Tray restore failed.");
+        HideForStartup();
+        if (IsVisible) throw new InvalidOperationException("Startup did not hide the window when close-to-tray is enabled.");
+        RestoreFromTray();
+        manager.SetCloseToTray(previous);
+        CloseToTrayEnabled.IsChecked = previous;
+        manager.Log("PASS: close-to-tray keeps HTTP alive, second launch restores the window, startup hides to tray, explicit exit supported.");
     }
     private void RefreshDevices()
     {
@@ -143,7 +231,9 @@ public partial class MainWindow : Window
     }
     private async void DeviceConnection(object sender, RoutedEventArgs e)
     {
-        var id = Id(sender); bool connected = manager.Snapshot().First(d => d.Profile.Id == id).Status.Connected;
+        var id = Id(sender); var view = manager.Snapshot().First(d => d.Profile.Id == id);
+        if (view.Connecting) return;
+        bool connected = view.Status.Connected;
         await Run(id, connected ? "Освобождение Bluetooth…" : "Подключение…", () => connected ? manager.Act(id, "disconnect") : ConnectDevice(id));
     }
     private async void ConnectAll(object sender, RoutedEventArgs e) => await Run("all", "Подключение светильников…", manager.ConnectAll);
@@ -198,8 +288,11 @@ public partial class MainWindow : Window
     private async void OnClosing(object? sender, CancelEventArgs e)
     {
         if (closed) return;
+        if (((App)Application.Current).IsSessionEnding) { hotkeys?.Dispose(); DisposeTray(); return; }
+        if (!exitRequested && manager.Settings.CloseToTray && tray is not null && !closing)
+        { e.Cancel = true; Hide(); return; }
         e.Cancel = true; if (closing) return;
-        closing = true; hotkeys?.Dispose(); IsEnabled = false; StatusBar.Text = "Закрытие соединений…";
+        closing = true; hotkeys?.Dispose(); DisposeTray(); IsEnabled = false; StatusBar.Text = "Закрытие соединений…";
         try { await ((App)Application.Current).StopServices(); }
         finally { closed = true; Close(); Application.Current.Shutdown(); }
     }

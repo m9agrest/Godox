@@ -1,6 +1,6 @@
 #define MyAppName "Godox Desktop"
 #ifndef MyAppVersion
-  #define MyAppVersion "0.1.0"
+  #define MyAppVersion "0.2.0"
 #endif
 #define MyAppPublisher "m9agrest"
 #define MyAppExeName "Godox.Desktop.exe"
@@ -44,6 +44,10 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDi
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent
+
+[Registry]
+; Remove the current user's startup entry on uninstall, while preserving settings and keys.
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "GodoxDesktop"; Flags: dontcreatekey uninsdeletevalue
 
 ; User settings and Mesh keys live in LocalAppData\Godox, outside {app}.
 ; No UninstallDelete entry: uninstalling must preserve those files.

@@ -8,7 +8,7 @@ public sealed class DeviceManager(SettingsStore store, Settings settings, IBacke
     private readonly SemaphoreSlim gate = new(1, 1);
     private readonly object sync = new();
     private readonly Dictionary<string, DeviceStatus> states = [];
-    private readonly HashSet<string> pending = [], paused = [];
+    private readonly HashSet<string> pending = [], paused = [], connecting = [];
     private readonly Dictionary<string, DateTime> retryAfter = [];
     private bool settingsDirty, stopping;
     public event Action? Changed;
@@ -19,7 +19,7 @@ public sealed class DeviceManager(SettingsStore store, Settings settings, IBacke
     public IReadOnlyList<DeviceView> Snapshot()
     {
         lock (sync) return settings.Devices.Select(d => new DeviceView(d,
-            states.GetValueOrDefault(d.Id, new()), Effective(d), paused.Contains(d.Id))).ToArray();
+            states.GetValueOrDefault(d.Id, new()), Effective(d), paused.Contains(d.Id), connecting.Contains(d.Id))).ToArray();
     }
     public DeviceProfile Profile(string id) => Snapshot().FirstOrDefault(d => d.Profile.Id == id)?.Profile
         ?? throw new KeyNotFoundException("Устройство не найдено.");
@@ -127,7 +127,8 @@ public sealed class DeviceManager(SettingsStore store, Settings settings, IBacke
         }
         finally { Changed?.Invoke(); }
     }
-    private bool CanAutoConnect(DeviceProfile p) => !stopping && settings.AutoConnectEnabled && p.AutoConnect &&
+    private bool CanAutoConnect(DeviceProfile p, bool ownAttempt = false) => !stopping && settings.AutoConnectEnabled && p.AutoConnect &&
+        (ownAttempt || !connecting.Contains(p.Id)) &&
         !paused.Contains(p.Id) && states.GetValueOrDefault(p.Id)?.Connected != true && File.Exists(p.StatePath) &&
         retryAfter.GetValueOrDefault(p.Id) <= DateTime.UtcNow;
     public async Task AutoConnect()
@@ -146,6 +147,19 @@ public sealed class DeviceManager(SettingsStore store, Settings settings, IBacke
     public Task<DeviceView> Act(string id, string command, int? brightness = null, int? cct = null) => ActCore(id, command, brightness, cct);
     private async Task<DeviceView> ActCore(string id, string command, int? brightness = null, int? cct = null, bool automatic = false)
     {
+        bool connectionAttempt = command is "connect" or "provision" or "rebind";
+        if (connectionAttempt)
+        {
+            lock (sync)
+            {
+                var profile = Profile(id);
+                if (automatic && !CanAutoConnect(profile)) return Snapshot().First(d => d.Profile.Id == id);
+                if (command == "connect" && states.GetValueOrDefault(id)?.Connected == true)
+                    return Snapshot().First(d => d.Profile.Id == id);
+                if (!connecting.Add(id)) throw new InvalidOperationException("Подключение этого светильника уже выполняется.");
+            }
+            Changed?.Invoke();
+        }
         if (command == "disconnect") lock (sync) { paused.Add(id); pending.Remove(id); }
         await gate.WaitAsync();
         try
@@ -154,7 +168,7 @@ public sealed class DeviceManager(SettingsStore store, Settings settings, IBacke
             if (stopping) throw new InvalidOperationException("Приложение закрывается.");
             if (command == "connect") lock (sync)
             {
-                if (automatic && !CanAutoConnect(profile)) return Snapshot().First(d => d.Profile.Id == id);
+                if (automatic && !CanAutoConnect(profile, ownAttempt: true)) return Snapshot().First(d => d.Profile.Id == id);
                 if (!automatic) paused.Remove(id);
                 retryAfter[id] = DateTime.UtcNow.AddSeconds(30);
             }
@@ -191,7 +205,8 @@ public sealed class DeviceManager(SettingsStore store, Settings settings, IBacke
             if (command == "connect") await SendMixer(id);
             Changed?.Invoke();
             Log($"{profile.Name}: {command}{(status.Warning is null ? "" : " — " + status.Warning)}");
-            return Snapshot().First(d => d.Profile.Id == id);
+            var completed = Snapshot().First(d => d.Profile.Id == id);
+            return connectionAttempt ? completed with { Connecting = false } : completed;
         }
         catch (Exception exc)
         {
@@ -202,7 +217,12 @@ public sealed class DeviceManager(SettingsStore store, Settings settings, IBacke
             }
             Changed?.Invoke(); Log(exc.Message); throw;
         }
-        finally { gate.Release(); }
+        finally
+        {
+            if (connectionAttempt) lock (sync) connecting.Remove(id);
+            gate.Release();
+            if (connectionAttempt) Changed?.Invoke();
+        }
     }
     public async Task ConnectAll()
     {
@@ -281,6 +301,16 @@ public sealed class DeviceManager(SettingsStore store, Settings settings, IBacke
         await gate.WaitAsync();
         try { lock (sync) { settings.ApiPort = port; settings.ApiEnabled = api; settings.HotkeysEnabled = hotkeys; store.Save(settings); } }
         finally { gate.Release(); }
+    }
+    public void SetCloseToTray(bool enabled)
+    {
+        lock (sync)
+        {
+            bool previous = settings.CloseToTray;
+            settings.CloseToTray = enabled;
+            try { store.Save(settings); }
+            catch { settings.CloseToTray = previous; throw; }
+        }
     }
     public void Stop()
     {

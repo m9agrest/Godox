@@ -9,6 +9,7 @@ test\.venv\Scripts\python.exe -m unittest discover -s tests -p test_worker.py -v
 dotnet run --project tests\BindingTests -c Release
 dotnet run --project tests\MixerTests -c Release
 dotnet run --project tests\StorageTests -c Release
+dotnet run --project tests\DesktopTests -c Release
 test\.venv\Scripts\python.exe tests\api_integration.py
 ```
 
@@ -30,7 +31,18 @@ build\Godox.Desktop.exe --root "%CD%" --data-dir "%CD%\artifacts\ui-preview" --s
 и закрывается. Пустой первый запуск также поддерживается.
 `--mixer-smoke` предназначен для вручную подготовленного демонстрационного набора
 из двух отключённых профилей с выключенным автоподключением; он проверяет события
-ползунков, сохранение пропорций и перестановку колонок.
+ползунков, сохранение пропорций, перестановку колонок и блокировку кнопки подключения.
+
+```cmd
+test\.venv\Scripts\python.exe tests\desktop_integration.py
+```
+
+Этот сценарий сам создаёт отключённые демонстрационные профили и проверяет
+закрытие в трей, работу HTTP и хоткеев со скрытым окном, восстановление при повторном
+запуске и полное завершение через «Выход». Снимок вкладки настроек сохраняется рядом
+с остальными. Для автономной сборки добавьте `--exe dist\Godox-win-x64\Godox.Desktop.exe`.
+Проверка регистрации автозапуска в `DesktopTests` использует отдельный временный
+раздел реестра; настоящий автозапуск пользователя не меняется.
 
 ## На настоящих светильниках
 

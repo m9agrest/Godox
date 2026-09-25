@@ -10,6 +10,9 @@ namespace Godox.Desktop;
 public partial class App : Application
 {
     private Mutex? mutex;
+    private EventWaitHandle? activation;
+    private RegisteredWaitHandle? activationWait;
+    public bool IsSessionEnding { get; private set; }
     private BackendBridge? bridge;
     private LocalApi? api;
     private readonly CancellationTokenSource monitorCancellation = new();
@@ -43,8 +46,9 @@ public partial class App : Application
                 dataDirectory = Path.GetFullPath(e.Args[dataIndex + 1]);
             }
             string key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Path.TrimEndingDirectorySeparator(dataDirectory).ToUpperInvariant())))[..20];
+            activation = new EventWaitHandle(false, EventResetMode.AutoReset, "Local\\GodoxDesktop-Show-" + key);
             mutex = new Mutex(true, "Local\\GodoxDesktop-" + key, out var created);
-            if (!created) { MessageBox.Show("Godox Desktop уже запущен.", "Godox"); Shutdown(); return; }
+            if (!created) { if (!e.Args.Contains("--startup")) activation.Set(); Shutdown(); return; }
             var store = new SettingsStore(root, dataDirectory);
             var settings = store.Load();
             if (settings.ApiPort is < 1024 or > 65535 || string.IsNullOrWhiteSpace(settings.ApiToken))
@@ -64,14 +68,21 @@ public partial class App : Application
                 if (apiError is not null) throw new IOException(apiError);
                 return;
             }
-            var window = new MainWindow(store, manager, api);
+            var startup = new WindowsStartup(Environment.ProcessPath ?? throw new IOException("Путь приложения неизвестен."), root, dataDirectory);
+            var window = new MainWindow(store, manager, api, startup);
             MainWindow = window;
+            activationWait = ThreadPool.RegisterWaitForSingleObject(activation, (_, _) => Dispatcher.BeginInvoke(window.RestoreFromTray), null, Timeout.Infinite, false);
             window.Show();
+            if (e.Args.Contains("--startup"))
+            {
+                await Dispatcher.InvokeAsync(window.HideForStartup, System.Windows.Threading.DispatcherPriority.ContextIdle);
+            }
             if (apiError is not null) manager.Log(apiError);
-            if (e.Args.Contains("--smoke") || e.Args.Contains("--lifecycle-smoke") || e.Args.Contains("--mixer-smoke"))
+            if (e.Args.Contains("--smoke") || e.Args.Contains("--lifecycle-smoke") || e.Args.Contains("--mixer-smoke") || e.Args.Contains("--desktop-smoke"))
             {
                 await Task.Delay(700);
                 if (e.Args.Contains("--mixer-smoke")) await window.ProbeMixer();
+                if (e.Args.Contains("--desktop-smoke")) await window.ProbeDesktop();
                 bool hotkeyDelivered = false;
                 manager.Logged += line => { if (line.Contains("Хоткей:")) hotkeyDelivered = true; };
                 // Own-window WM_HOTKEY delivery only; devices remain disconnected.
@@ -87,6 +98,9 @@ public partial class App : Application
                 window.MainTabs.SelectedIndex = 1;
                 await Task.Delay(100);
                 Capture(window, Path.Combine(folder, "ui-integration.png"));
+                window.MainTabs.SelectedItem = window.SettingsTab;
+                await Task.Delay(100);
+                Capture(window, Path.Combine(folder, "ui-settings.png"));
                 var editor = new DeviceDialog(store, manager.Snapshot().FirstOrDefault()?.Profile, null) { Owner = window };
                 editor.Show();
                 await Task.Delay(100);
@@ -96,7 +110,7 @@ public partial class App : Application
                     devices = manager.Snapshot().Count, connected = manager.Snapshot().Count(d => d.Status.Connected),
                     hotkeys = window.HotkeyCount, hotkeyDelivered,
                     api = api.Status, width = window.ActualWidth, height = window.ActualHeight }));
-                window.Close();
+                window.ExitApplication();
             }
         }
         catch (Exception exc)
@@ -138,7 +152,17 @@ public partial class App : Application
     }
     protected override void OnExit(ExitEventArgs e)
     {
+        (MainWindow as MainWindow)?.DisposeTray();
+        activationWait?.Unregister(null);
+        activation?.Dispose();
         mutex?.Dispose();
         base.OnExit(e);
+    }
+    protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
+    {
+        IsSessionEnding = true;
+        deviceManager?.Stop();
+        (MainWindow as MainWindow)?.DisposeTray();
+        base.OnSessionEnding(e);
     }
 }

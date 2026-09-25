@@ -9,8 +9,9 @@ public sealed class MixerItem(DeviceView view) : INotifyPropertyChanged
     public string Id => View.Profile.Id;
     public string Name => View.Name;
     public string Address => View.Profile.Address;
-    public string Connection => View.Status.Connected ? "● Подключён" : "○ Отключён";
-    public string ConnectText => View.Status.Connected ? "Отключить" : "Подключить";
+    public string Connection => View.Connecting ? "◌ Подключается…" : View.Status.Connected ? "● Подключён" : "○ Отключён";
+    public string ConnectText => View.Connecting ? "Подключается…" : View.Status.Connected ? "Отключить" : "Подключить";
+    public bool CanConnect => !View.Connecting;
     public int Level => View.Profile.MixerLevel ?? View.Profile.ResumeBrightness;
     public int Cct => View.Profile.PreferredCct;
     public string CctText => $"{Cct} K";

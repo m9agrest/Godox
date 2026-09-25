@@ -65,7 +65,7 @@
            </StackPanel><TextBlock Text="{Binding Name}" FontSize="19" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/></DockPanel>
            <TextBlock Text="{Binding Address}" Foreground="{StaticResource Muted}" FontFamily="Consolas" FontSize="12" Margin="0,7,0,0"/>
            <TextBlock Text="{Binding Connection}" Foreground="{StaticResource Accent}" Margin="0,12,0,8"/>
-           <Button Content="{Binding ConnectText}" Tag="{Binding Id}" Click="DeviceConnection" Margin="0,0,0,4" Padding="10,7"/>
+           <Button Content="{Binding ConnectText}" IsEnabled="{Binding CanConnect}" Tag="{Binding Id}" Click="DeviceConnection" Margin="0,0,0,4" Padding="10,7"/>
            <TextBlock Text="{Binding Levels}" FontSize="23" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,5,0,8" ToolTip="Уровень лампы (результат с учётом общего уровня и приглушения)"/>
            <Slider Style="{StaticResource MixerFader}" Value="{Binding Level, Mode=OneWay}" Tag="{Binding Id}" ValueChanged="LevelChanged" Orientation="Vertical" Height="165" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True" HorizontalAlignment="Center" ToolTip="Уровень этой лампы"/>
            <TextBlock Text="{Binding Output}" Foreground="{StaticResource Muted}" FontSize="12" HorizontalAlignment="Center" Margin="0,12,0,8"/>
@@ -109,6 +109,17 @@
      <WrapPanel Margin="0,12,0,8"><Button Content="Копировать токен API" Click="CopyToken"/><Button Content="Копировать команду для CMD" Click="CopyCurl"/></WrapPanel>
      <TextBlock Text="В запросах нужен заголовок X-Godox-Token. Сервер доступен только через 127.0.0.1; ключи Bluetooth по API не выдаются." TextWrapping="Wrap" Foreground="{StaticResource Muted}"/>
      <TextBox x:Name="ApiExamples" IsReadOnly="True" FontFamily="Consolas" FontSize="13" TextWrapping="Wrap" Margin="0,18,0,0"/>
+    </StackPanel></ScrollViewer>
+   </TabItem>
+   <TabItem x:Name="SettingsTab" Header="Настройки">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Foreground="{StaticResource Text}"><StackPanel Margin="24" MaxWidth="760" HorizontalAlignment="Left">
+     <TextBlock Text="Запуск и закрытие" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,12"/>
+     <CheckBox x:Name="StartupEnabled" Content="Запускать вместе с Windows" Click="StartupChanged"/>
+     <TextBlock Text="Godox Desktop запустится при входе в вашу учётную запись Windows. Автоподключение к светильникам настраивается отдельно в микшере." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,20"/>
+     <CheckBox x:Name="CloseToTrayEnabled" Content="При закрытии оставлять в трее" Click="CloseToTrayChanged"/>
+     <TextBlock Text="Крестик скрывает окно. Светильники остаются подключёнными, горячие клавиши и HTTP API продолжают работать. Нажмите значок Godox в трее, чтобы вернуть окно. При автозапуске окно также будет скрыто в трей." TextWrapping="Wrap" Foreground="{StaticResource Muted}"/>
+     <TextBlock Text="Настройки применяются сразу. Для полного закрытия выберите «Выход» в меню значка или нажмите кнопку ниже." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,20,0,14"/>
+     <Button Content="Выйти из приложения" Click="ExitClicked" HorizontalAlignment="Left"/>
     </StackPanel></ScrollViewer>
    </TabItem>
    <TabItem Header="Журнал"><TextBox x:Name="LogBox" IsReadOnly="True" FontFamily="Consolas" FontSize="13" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Margin="0,18,0,0"/></TabItem>

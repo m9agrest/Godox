@@ -26,6 +26,7 @@ public class Settings
     public bool ApiEnabled { get; set; } = true;
     public bool HotkeysEnabled { get; set; } = true;
     public bool AutoConnectEnabled { get; set; }
+    public bool CloseToTray { get; set; }
     public int MasterLevel { get; set; } = 100;
     public bool MasterMuted { get; set; }
     public string PythonPath { get; set; } = "test/.venv/Scripts/python.exe";
@@ -34,11 +35,11 @@ public class Settings
 }
 
 public record DeviceStatus(bool Connected = false, int? Brightness = null, int? Cct = null, string? Warning = null);
-public record DeviceView(DeviceProfile Profile, DeviceStatus Status, int EffectiveBrightness = 0, bool AutoPaused = false)
+public record DeviceView(DeviceProfile Profile, DeviceStatus Status, int EffectiveBrightness = 0, bool AutoPaused = false, bool Connecting = false)
 {
     public string Name => Profile.Name;
     public string Details => $"{Profile.Model} · {Profile.Address}";
-    public string Connection => Status.Connected ? "Подключён" : "Отключён";
+    public string Connection => Connecting ? "Подключается…" : Status.Connected ? "Подключён" : "Отключён";
     public string Values => Status.Brightness is { } b ? $"{b}%  ·  {Status.Cct?.ToString() ?? "—"} K" : "Ожидает подключения";
 }
 public record ScanResult(string Address, string Name, string? Model, int Rssi, bool NeedsProvisioning)

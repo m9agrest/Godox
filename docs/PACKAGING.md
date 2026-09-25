@@ -62,6 +62,7 @@ in its own directory. User data continues to live in `%LOCALAPPDATA%\Godox`.
 `%LOCALAPPDATA%\Programs\Godox Desktop`, adds a Start menu shortcut and optionally
 a desktop shortcut. No administrator privileges are required. Uninstall removes
 the installed program, preserving settings and Mesh bindings in the separate data folder.
+The application's per-user `GodoxDesktop` Run entry is removed on uninstall.
 The installer and ZIP contain no developer settings, tokens or binding files.
 
 Version comes from `<Version>` in `Godox.Desktop.csproj`; `build.bat` passes it to Inno Setup.
