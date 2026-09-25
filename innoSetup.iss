@@ -1,6 +1,6 @@
 #define MyAppName "Godox Desktop"
 #ifndef MyAppVersion
-  #define MyAppVersion "0.2.0"
+  #define MyAppVersion "0.2.1"
 #endif
 #define MyAppPublisher "m9agrest"
 #define MyAppExeName "Godox.Desktop.exe"

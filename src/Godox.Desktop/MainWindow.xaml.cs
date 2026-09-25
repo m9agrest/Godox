@@ -82,6 +82,7 @@ public partial class MainWindow : Window
         InitializeComponent(); Devices.ItemsSource = items;
         StartupEnabled.IsChecked = startup.Enabled;
         CloseToTrayEnabled.IsChecked = manager.Settings.CloseToTray;
+        StartInTrayEnabled.IsChecked = manager.Settings.StartInTray;
         HotkeysEnabled.IsChecked = manager.Settings.HotkeysEnabled;
         ApiEnabled.IsChecked = manager.Settings.ApiEnabled;
         ApiPort.Text = manager.Settings.ApiPort.ToString(); ApiStatus.Text = api.Status;
@@ -91,13 +92,17 @@ public partial class MainWindow : Window
             if (LogBox.Text.Length > 50000) LogBox.Text = LogBox.Text[^30000..];
             LogBox.AppendText(line + Environment.NewLine); LogBox.ScrollToEnd();
         });
-        Loaded += (_, _) => {
-            if (hotkeys is null) { hotkeys = new Hotkeys(this, manager); ApplyHotkeys(); }
-            if (tray is null)
-                try { tray = new TrayIcon(this); }
-                catch (Exception exc) { manager.Log("Значок трея недоступен: " + exc.Message); }
-        };
         RefreshDevices();
+    }
+    public void Start(bool automatic)
+    {
+        // Create the message handle without showing the window, so startup in the
+        // tray has working hotkeys and no visible window or taskbar flash.
+        new System.Windows.Interop.WindowInteropHelper(this).EnsureHandle();
+        hotkeys = new Hotkeys(this, manager); ApplyHotkeys();
+        try { tray = new TrayIcon(this); }
+        catch (Exception exc) { manager.Log("Значок трея недоступен: " + exc.Message); }
+        if (!automatic || !manager.Settings.StartInTray || tray is null) Show();
     }
     public void RestoreFromTray()
     {
@@ -108,7 +113,6 @@ public partial class MainWindow : Window
     }
     public void ExitApplication() { exitRequested = true; Close(); }
     public void DisposeTray() { tray?.Dispose(); tray = null; }
-    internal void HideForStartup() { if (manager.Settings.CloseToTray && tray is not null) Hide(); }
     private void ExitClicked(object sender, RoutedEventArgs e) => ExitApplication();
     private void StartupChanged(object sender, RoutedEventArgs e)
     {
@@ -119,6 +123,16 @@ public partial class MainWindow : Window
     {
         Change(() => manager.SetCloseToTray(CloseToTrayEnabled.IsChecked == true));
         CloseToTrayEnabled.IsChecked = manager.Settings.CloseToTray;
+    }
+    private void StartInTrayChanged(object sender, RoutedEventArgs e)
+    {
+        Change(() => manager.SetLaunchOptions(startInTray: StartInTrayEnabled.IsChecked == true));
+        StartInTrayEnabled.IsChecked = manager.Settings.StartInTray;
+    }
+    private void ApiStartupChanged(object sender, RoutedEventArgs e)
+    {
+        Change(() => manager.SetLaunchOptions(apiAtStartup: ApiEnabled.IsChecked == true));
+        ApiEnabled.IsChecked = manager.Settings.ApiEnabled;
     }
     internal async Task ProbeDesktop()
     {
@@ -152,12 +166,9 @@ public partial class MainWindow : Window
         await second.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
         await Task.Delay(200);
         if (!IsVisible || closing) throw new InvalidOperationException("Tray restore failed.");
-        HideForStartup();
-        if (IsVisible) throw new InvalidOperationException("Startup did not hide the window when close-to-tray is enabled.");
-        RestoreFromTray();
         manager.SetCloseToTray(previous);
         CloseToTrayEnabled.IsChecked = previous;
-        manager.Log("PASS: close-to-tray keeps HTTP alive, second launch restores the window, startup hides to tray, explicit exit supported.");
+        manager.Log("PASS: close-to-tray keeps HTTP alive, second launch restores the window, explicit exit supported.");
     }
     private void RefreshDevices()
     {
@@ -278,7 +289,7 @@ public partial class MainWindow : Window
     }
     private async void SaveOptions(object sender, RoutedEventArgs e) => await Run("options", "Сохранение настроек…", async () => {
         if (!int.TryParse(ApiPort.Text, out var port)) throw new ArgumentException("Укажите числовой порт.");
-        await manager.SaveOptions(port, ApiEnabled.IsChecked == true, HotkeysEnabled.IsChecked == true);
+        await manager.SaveOptions(port, HotkeysEnabled.IsChecked == true);
         ApplyHotkeys(); manager.Log("Настройки сохранены. HTTP API обновится после перезапуска.");
     });
     private void CopyToken(object sender, RoutedEventArgs e) => Change(() => { Clipboard.SetText(manager.Settings.ApiToken); StatusBar.Text = "Токен API скопирован."; });

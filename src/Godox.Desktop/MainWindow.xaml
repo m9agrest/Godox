@@ -101,7 +101,7 @@
      <TextBlock Text="Сочетание для каждого прибора задаётся в «Настроить». Оно включает и гасит подключённый светильник. Ctrl+Alt+0 приглушает общий микшер. Работает и в свёрнутом окне." TextWrapping="Wrap" Foreground="{StaticResource Muted}"/>
      <TextBlock x:Name="HotkeyStatus" Foreground="{StaticResource Accent}" Margin="0,10,0,24"/>
      <TextBlock Text="Локальный HTTP API" FontSize="24" FontWeight="SemiBold"/>
-     <CheckBox x:Name="ApiEnabled" Content="Разрешить команды от программ на этом компьютере"/>
+     <TextBlock Text="Автоматический запуск сервера включается во вкладке «Настройки»." Foreground="{StaticResource Muted}" Margin="0,10,0,14" TextWrapping="Wrap"/>
      <TextBlock Text="Порт"/><TextBox x:Name="ApiPort" Width="120" HorizontalAlignment="Left"/>
      <Button Content="Сохранить настройки" Click="SaveOptions" HorizontalAlignment="Left"/>
      <TextBlock Text="Параметры HTTP применятся после перезапуска приложения. Горячие клавиши обновятся сразу." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,2,0,18"/>
@@ -116,9 +116,14 @@
      <TextBlock Text="Запуск и закрытие" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,12"/>
      <CheckBox x:Name="StartupEnabled" Content="Запускать вместе с Windows" Click="StartupChanged"/>
      <TextBlock Text="Godox Desktop запустится при входе в вашу учётную запись Windows. Автоподключение к светильникам настраивается отдельно в микшере." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,20"/>
+     <CheckBox x:Name="StartInTrayEnabled" Content="При автозапуске сразу запускать в трее" Click="StartInTrayChanged"/>
+     <TextBlock Text="При входе в Windows окно не показывается. Открыть его можно через значок Godox в трее. Обычный запуск через ярлык всегда открывает окно." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,20"/>
      <CheckBox x:Name="CloseToTrayEnabled" Content="При закрытии оставлять в трее" Click="CloseToTrayChanged"/>
-     <TextBlock Text="Крестик скрывает окно. Светильники остаются подключёнными, горячие клавиши и HTTP API продолжают работать. Нажмите значок Godox в трее, чтобы вернуть окно. При автозапуске окно также будет скрыто в трей." TextWrapping="Wrap" Foreground="{StaticResource Muted}"/>
-     <TextBlock Text="Настройки применяются сразу. Для полного закрытия выберите «Выход» в меню значка или нажмите кнопку ниже." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,20,0,14"/>
+     <TextBlock Text="Крестик скрывает окно. Светильники остаются подключёнными, горячие клавиши и запущенный HTTP API продолжают работать. Эта настройка не влияет на поведение при автозапуске." TextWrapping="Wrap" Foreground="{StaticResource Muted}"/>
+     <TextBlock Text="Интеграция" FontSize="24" FontWeight="SemiBold" Margin="0,24,0,8"/>
+     <CheckBox x:Name="ApiEnabled" Content="Запускать локальный сервер при запуске программы" Click="ApiStartupChanged"/>
+     <TextBlock Text="Разрешает программам на этом компьютере управлять светом через HTTP API. Выбор сохранится сразу и применится при следующем запуске Godox Desktop. Порт и токен — во вкладке «Интеграция»." TextWrapping="Wrap" Foreground="{StaticResource Muted}"/>
+     <TextBlock Text="Для полного закрытия выберите «Выход» в меню значка или нажмите кнопку ниже." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,20,0,14"/>
      <Button Content="Выйти из приложения" Click="ExitClicked" HorizontalAlignment="Left"/>
     </StackPanel></ScrollViewer>
    </TabItem>

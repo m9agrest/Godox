@@ -85,6 +85,14 @@ try
     Check(store.Load().CloseToTray, "Close-to-tray setting survives reload");
     manager.SetCloseToTray(false);
     Check(!store.Load().CloseToTray, "Close-to-tray can be disabled persistently");
+    manager.SetLaunchOptions(startInTray: true, apiAtStartup: false);
+    var launch = store.Load();
+    Check(launch.StartInTray && !launch.CloseToTray && !launch.ApiEnabled, "Tray startup and API startup persist independently from close-to-tray");
+    await manager.SaveOptions(9876, true);
+    Check(!store.Load().ApiEnabled && store.Load().StartInTray, "Saving integration port and hotkeys preserves launch options");
+    manager.SetCloseToTray(true); manager.SetLaunchOptions(startInTray: false, apiAtStartup: true);
+    launch = store.Load();
+    Check(!launch.StartInTray && launch.CloseToTray && launch.ApiEnabled, "Startup window can be enabled while closing still uses tray");
     manager.Stop();
 }
 finally

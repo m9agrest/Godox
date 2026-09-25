@@ -12,7 +12,7 @@
     <Copyright>Copyright (c) 2026 m9agrest</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/m9agrest/Godox</RepositoryUrl>
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <ApplicationIcon>../../assets/godox.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup><FrameworkReference Include="Microsoft.AspNetCore.App" /></ItemGroup>

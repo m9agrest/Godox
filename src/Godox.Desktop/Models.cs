@@ -27,6 +27,7 @@ public class Settings
     public bool HotkeysEnabled { get; set; } = true;
     public bool AutoConnectEnabled { get; set; }
     public bool CloseToTray { get; set; }
+    public bool StartInTray { get; set; }
     public int MasterLevel { get; set; } = 100;
     public bool MasterMuted { get; set; }
     public string PythonPath { get; set; } = "test/.venv/Scripts/python.exe";

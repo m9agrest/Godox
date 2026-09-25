@@ -72,13 +72,29 @@ public partial class App : Application
             var window = new MainWindow(store, manager, api, startup);
             MainWindow = window;
             activationWait = ThreadPool.RegisterWaitForSingleObject(activation, (_, _) => Dispatcher.BeginInvoke(window.RestoreFromTray), null, Timeout.Infinite, false);
-            window.Show();
-            if (e.Args.Contains("--startup"))
+            int visibleTransitions = 0;
+            window.IsVisibleChanged += (_, _) => { if (window.IsVisible) visibleTransitions++; };
+            window.Start(e.Args.Contains("--startup"));
+            if (e.Args.Contains("--startup-smoke"))
             {
-                await Dispatcher.InvokeAsync(window.HideForStartup, System.Windows.Threading.DispatcherPriority.ContextIdle);
+                if (string.Equals(store.DataDirectory, SettingsStore.DefaultDataDirectory, StringComparison.OrdinalIgnoreCase) || settings.AutoConnectEnabled)
+                    throw new InvalidOperationException("Startup smoke requires isolated data and auto-connect off.");
+                await Task.Delay(300);
+                var folder = Path.Combine(dataDirectory, "artifacts"); Directory.CreateDirectory(folder);
+                bool listening;
+                using (var client = new System.Net.Sockets.TcpClient())
+                {
+                    try { await client.ConnectAsync("127.0.0.1", settings.ApiPort).WaitAsync(TimeSpan.FromSeconds(2)); listening = true; }
+                    catch (System.Net.Sockets.SocketException) { listening = false; }
+                    catch (TimeoutException) { listening = false; }
+                }
+                File.WriteAllText(Path.Combine(folder, "startup-smoke.json"), System.Text.Json.JsonSerializer.Serialize(new {
+                    visible = window.IsVisible, visibleTransitions, listening, hotkeys = window.HotkeyCount,
+                    startInTray = settings.StartInTray, closeToTray = settings.CloseToTray, apiEnabled = settings.ApiEnabled }));
+                window.RestoreFromTray();
             }
             if (apiError is not null) manager.Log(apiError);
-            if (e.Args.Contains("--smoke") || e.Args.Contains("--lifecycle-smoke") || e.Args.Contains("--mixer-smoke") || e.Args.Contains("--desktop-smoke"))
+            if (e.Args.Contains("--smoke") || e.Args.Contains("--lifecycle-smoke") || e.Args.Contains("--mixer-smoke") || e.Args.Contains("--desktop-smoke") || e.Args.Contains("--startup-smoke"))
             {
                 await Task.Delay(700);
                 if (e.Args.Contains("--mixer-smoke")) await window.ProbeMixer();
@@ -118,7 +134,8 @@ public partial class App : Application
             try
             { Directory.CreateDirectory(Path.Combine(dataDirectory, "logs")); File.AppendAllText(Path.Combine(dataDirectory, "logs", "errors.log"), exc + Environment.NewLine); }
             catch (IOException) { } catch (UnauthorizedAccessException) { }
-            if (!e.Args.Contains("--headless")) MessageBox.Show(exc.Message, "Godox — ошибка запуска");
+            if (!e.Args.Contains("--headless") && !e.Args.Any(a => a == "--smoke" || a.EndsWith("-smoke", StringComparison.Ordinal)))
+                MessageBox.Show(exc.Message, "Godox — ошибка запуска");
             await StopServices();
             Shutdown(1);
         }

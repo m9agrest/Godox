@@ -38,5 +38,5 @@ assert (folder / 'artifacts/ui-settings.png').is_file()
 assert not list(folder.glob('*_mesh_state.json')), 'Offline test must not create real bindings.'
 saved = json.loads((folder / 'settings.json').read_text(encoding='utf-8-sig'))
 assert saved['closeToTray'] and not saved['autoConnectEnabled']
-print('PASS: pending connection button, close-to-tray, background HTTP/hotkeys, second launch activation, startup hiding and explicit exit.')
+print('PASS: pending connection button, close-to-tray, background HTTP/hotkeys, second launch activation and explicit exit.')
 print('Screenshots: ' + str(folder / 'artifacts'))

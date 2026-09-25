@@ -35,6 +35,7 @@ build\Godox.Desktop.exe --root "%CD%" --data-dir "%CD%\artifacts\ui-preview" --s
 
 ```cmd
 test\.venv\Scripts\python.exe tests\desktop_integration.py
+test\.venv\Scripts\python.exe tests\startup_integration.py
 ```
 
 Этот сценарий сам создаёт отключённые демонстрационные профили и проверяет
@@ -43,6 +44,11 @@ test\.venv\Scripts\python.exe tests\desktop_integration.py
 с остальными. Для автономной сборки добавьте `--exe dist\Godox-win-x64\Godox.Desktop.exe`.
 Проверка регистрации автозапуска в `DesktopTests` использует отдельный временный
 раздел реестра; настоящий автозапуск пользователя не меняется.
+
+`startup_integration.py` запускает отдельные экземпляры с разными сочетаниями
+обычного/автоматического запуска, старта в трее, закрытия в трей и HTTP API.
+Проверяет отсутствие даже кратковременного показа окна при скрытом старте,
+а также реальное наличие или отсутствие слушающего локального сервера.
 
 ## На настоящих светильниках
 

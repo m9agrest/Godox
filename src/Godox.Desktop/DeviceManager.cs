@@ -295,11 +295,11 @@ public sealed class DeviceManager(SettingsStore store, Settings settings, IBacke
         finally { gate.Release(); }
         Changed?.Invoke();
     }
-    public async Task SaveOptions(int port, bool api, bool hotkeys)
+    public async Task SaveOptions(int port, bool hotkeys)
     {
         if (port is < 1024 or > 65535) throw new ArgumentException("Порт: 1024–65535.");
         await gate.WaitAsync();
-        try { lock (sync) { settings.ApiPort = port; settings.ApiEnabled = api; settings.HotkeysEnabled = hotkeys; store.Save(settings); } }
+        try { lock (sync) { settings.ApiPort = port; settings.HotkeysEnabled = hotkeys; store.Save(settings); } }
         finally { gate.Release(); }
     }
     public void SetCloseToTray(bool enabled)
@@ -310,6 +310,18 @@ public sealed class DeviceManager(SettingsStore store, Settings settings, IBacke
             settings.CloseToTray = enabled;
             try { store.Save(settings); }
             catch { settings.CloseToTray = previous; throw; }
+        }
+    }
+    public void SetLaunchOptions(bool? startInTray = null, bool? apiAtStartup = null)
+    {
+        lock (sync)
+        {
+            var previousTray = settings.StartInTray;
+            var previousApi = settings.ApiEnabled;
+            settings.StartInTray = startInTray ?? previousTray;
+            settings.ApiEnabled = apiAtStartup ?? previousApi;
+            try { store.Save(settings); }
+            catch { settings.StartInTray = previousTray; settings.ApiEnabled = previousApi; throw; }
         }
     }
     public void Stop()
