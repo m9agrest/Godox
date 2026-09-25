@@ -1,0 +1,3 @@
+bleak==3.0.2
+cryptography==50.0.1
+godox-mesh-bt @ git+https://github.com/binary-person/ha-godox-mesh.git@f07d872c6f34a656ed935c120b9b679bf0378fbd

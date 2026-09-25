@@ -1,0 +1,120 @@
+<Window x:Class="Godox.Desktop.MainWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Style="{StaticResource {x:Type Window}}" Title="Godox Desktop" Width="1180" Height="930" MinWidth="900" MinHeight="750"
+ WindowStartupLocation="CenterScreen" Closing="OnClosing">
+ <Window.Resources>
+  <Style x:Key="MixerFader" TargetType="Slider">
+   <Setter Property="Width" Value="52"/><Setter Property="IsMoveToPointEnabled" Value="True"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Slider">
+    <Grid Background="Transparent" Margin="0,6">
+     <Border Width="4" Background="#506173" CornerRadius="2" Margin="0,5"/>
+     <Track x:Name="PART_Track" Orientation="Vertical" Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" Value="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" IsDirectionReversed="{TemplateBinding IsDirectionReversed}">
+      <Track.DecreaseRepeatButton><RepeatButton Command="Slider.DecreaseLarge" Focusable="False"><RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Background="Transparent"/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.DecreaseRepeatButton>
+      <Track.Thumb><Thumb Width="28" Height="12"><Thumb.Template><ControlTemplate TargetType="Thumb"><Border Background="{StaticResource Accent}" BorderBrush="#FFF0D7" BorderThickness="1" CornerRadius="3"/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
+      <Track.IncreaseRepeatButton><RepeatButton Command="Slider.IncreaseLarge" Focusable="False"><RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Background="Transparent"/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.IncreaseRepeatButton>
+     </Track>
+    </Grid>
+   </ControlTemplate></Setter.Value></Setter>
+  </Style>
+ </Window.Resources>
+ <Grid Margin="28,22">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Grid Margin="0,0,0,22"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+   <StackPanel><TextBlock Text="GODOX / DESKTOP" FontSize="13" Foreground="{StaticResource Accent}" FontWeight="SemiBold"/>
+    <TextBlock Text="Свет под контролем" FontSize="30" FontWeight="SemiBold" Margin="0,4,0,3"/>
+    <TextBlock Text="Устройства, горячие клавиши и локальные команды" Foreground="{StaticResource Muted}"/>
+   </StackPanel>
+
+  </Grid>
+  <TabControl x:Name="MainTabs" Grid.Row="1" Background="{StaticResource Bg}" BorderThickness="0">
+   <TabItem Header="Микшер">
+    <Grid Margin="0,18,0,0" TextElement.Foreground="{StaticResource Text}">
+     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/></Grid.RowDefinitions>
+     <WrapPanel>
+      <Button Content="Подключить все" Click="ConnectAll" Background="{StaticResource Accent}" Foreground="#17212B"/>
+      <Button Content="Отключить все" Click="DisconnectAll"/>
+      <Button Content="+ Добавить" Click="AddDevice"/>
+      <Button Content="Найти по Bluetooth" Click="ScanDevices"/>
+      <CheckBox x:Name="AutoConnectEnabled" Content="Автоподключение" Click="GlobalAutoChanged" Margin="12,9,0,8" ToolTip="При запуске и потере связи. Только для отмеченных приборов с сохранённой привязкой."/>
+     </WrapPanel>
+     <TextBlock Grid.Row="1" Text="Уровень лампы × общий уровень = яркость в скобках. Ползунки применяются сразу." Foreground="{StaticResource Muted}" Margin="0,4,0,15" TextWrapping="Wrap"/>
+     <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Foreground="{StaticResource Text}">
+      <StackPanel Orientation="Horizontal" VerticalAlignment="Top">
+       <Border Width="190" Background="#253241" CornerRadius="10" Padding="18" Margin="0,0,12,8">
+        <StackPanel>
+         <TextBlock Text="Общий" FontSize="22" FontWeight="SemiBold"/>
+         <TextBlock Text="Все светильники" Foreground="{StaticResource Muted}" Margin="0,5,0,0"/>
+         <TextBlock Text="Сохраняет пропорции" Foreground="{StaticResource Accent}" Margin="0,12,0,0" FontSize="12"/>
+         <Border Height="39"/>
+         <TextBlock x:Name="MasterValue" FontSize="23" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,5,0,8"/>
+         <Slider x:Name="MasterSlider" Style="{StaticResource MixerFader}" Orientation="Vertical" Height="165" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True" Value="100" ValueChanged="MasterChanged" HorizontalAlignment="Center" ToolTip="Общий множитель яркости"/>
+         <TextBlock Text="Общий множитель" Foreground="{StaticResource Muted}" FontSize="12" HorizontalAlignment="Center" Margin="0,12,0,8"/>
+         <Button x:Name="MasterMute" Content="Погасить всё" Click="ToggleMaster" Margin="0,0,0,8"/>
+         <TextBlock Text="Приглушение сохраняет уровни. Повторное нажатие возвращает свет." Foreground="{StaticResource Muted}" TextWrapping="Wrap" FontSize="12" Margin="0,12,0,0"/>
+        </StackPanel>
+       </Border>
+       <ItemsControl x:Name="Devices">
+        <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate><DataTemplate>
+         <Border Width="235" Background="{StaticResource Panel}" CornerRadius="10" Padding="16" Margin="0,0,12,8">
+          <StackPanel>
+           <DockPanel><StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+            <Button Content="←" Tag="{Binding Id}" Click="MoveLeft" Padding="6,3" Margin="4,0,0,0" ToolTip="Переместить влево"/>
+            <Button Content="→" Tag="{Binding Id}" Click="MoveRight" Padding="6,3" Margin="4,0,0,0" ToolTip="Переместить вправо"/>
+           </StackPanel><TextBlock Text="{Binding Name}" FontSize="19" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/></DockPanel>
+           <TextBlock Text="{Binding Address}" Foreground="{StaticResource Muted}" FontFamily="Consolas" FontSize="12" Margin="0,7,0,0"/>
+           <TextBlock Text="{Binding Connection}" Foreground="{StaticResource Accent}" Margin="0,12,0,8"/>
+           <Button Content="{Binding ConnectText}" Tag="{Binding Id}" Click="DeviceConnection" Margin="0,0,0,4" Padding="10,7"/>
+           <TextBlock Text="{Binding Levels}" FontSize="23" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,5,0,8" ToolTip="Уровень лампы (результат с учётом общего уровня и приглушения)"/>
+           <Slider Style="{StaticResource MixerFader}" Value="{Binding Level, Mode=OneWay}" Tag="{Binding Id}" ValueChanged="LevelChanged" Orientation="Vertical" Height="165" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True" HorizontalAlignment="Center" ToolTip="Уровень этой лампы"/>
+           <TextBlock Text="{Binding Output}" Foreground="{StaticResource Muted}" FontSize="12" HorizontalAlignment="Center" Margin="0,12,0,8"/>
+           <Button Content="{Binding MuteText}" Tag="{Binding Id}" Click="DeviceMute" Margin="0,0,0,8"/>
+           <DockPanel><TextBlock Text="Температура" Foreground="{StaticResource Muted}"/><TextBlock Text="{Binding CctText}" HorizontalAlignment="Right"/></DockPanel>
+           <Slider Value="{Binding Cct, Mode=OneWay}" Tag="{Binding Id}" ValueChanged="TemperatureChanged" Minimum="2800" Maximum="6500" TickFrequency="100" IsSnapToTickEnabled="True" Margin="0,8,0,4"/>
+           <CheckBox Content="Автоподключение" IsChecked="{Binding AutoConnect, Mode=OneWay}" Tag="{Binding Id}" Click="DeviceAutoChanged"/>
+           <TextBlock Text="{Binding AutoStatus}" FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap"/>
+           <WrapPanel Margin="0,8,0,0"><Button Content="Настроить" Tag="{Binding Id}" Click="EditDevice" Padding="10,6"/>
+            <Button Content="Ещё…" Click="MoreActions" Padding="10,6">
+             <Button.ContextMenu><ContextMenu>
+              <MenuItem Header="Прочитать состояние" Tag="status" Click="ExtraAction"/>
+              <MenuItem Header="Создать привязку после сброса" Tag="provision" Click="ExtraAction"/>
+              <MenuItem Header="Завершить привязку" Tag="rebind" Click="ExtraAction"/>
+              <Separator/><MenuItem Header="Убрать из списка" Tag="remove" Click="ExtraAction"/>
+             </ContextMenu></Button.ContextMenu>
+            </Button>
+           </WrapPanel>
+           <TextBlock Text="{Binding Warning}" Foreground="{StaticResource Accent}" FontSize="12" TextWrapping="Wrap" MaxHeight="66" ToolTip="{Binding Warning}"/>
+          </StackPanel>
+         </Border>
+        </DataTemplate></ItemsControl.ItemTemplate>
+       </ItemsControl>
+      </StackPanel>
+     </ScrollViewer>
+    </Grid>
+   </TabItem>
+
+   <TabItem Header="Интеграция">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Foreground="{StaticResource Text}"><StackPanel Margin="24" MaxWidth="820" HorizontalAlignment="Left">
+     <TextBlock Text="Горячие клавиши" FontSize="24" FontWeight="SemiBold"/>
+     <CheckBox x:Name="HotkeysEnabled" Content="Включить глобальные горячие клавиши"/>
+     <TextBlock Text="Сочетание для каждого прибора задаётся в «Настроить». Оно включает и гасит подключённый светильник. Ctrl+Alt+0 приглушает общий микшер. Работает и в свёрнутом окне." TextWrapping="Wrap" Foreground="{StaticResource Muted}"/>
+     <TextBlock x:Name="HotkeyStatus" Foreground="{StaticResource Accent}" Margin="0,10,0,24"/>
+     <TextBlock Text="Локальный HTTP API" FontSize="24" FontWeight="SemiBold"/>
+     <CheckBox x:Name="ApiEnabled" Content="Разрешить команды от программ на этом компьютере"/>
+     <TextBlock Text="Порт"/><TextBox x:Name="ApiPort" Width="120" HorizontalAlignment="Left"/>
+     <Button Content="Сохранить настройки" Click="SaveOptions" HorizontalAlignment="Left"/>
+     <TextBlock Text="Параметры HTTP применятся после перезапуска приложения. Горячие клавиши обновятся сразу." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,2,0,18"/>
+     <TextBlock x:Name="ApiStatus" FontWeight="SemiBold" FontSize="18"/>
+     <WrapPanel Margin="0,12,0,8"><Button Content="Копировать токен API" Click="CopyToken"/><Button Content="Копировать команду для CMD" Click="CopyCurl"/></WrapPanel>
+     <TextBlock Text="В запросах нужен заголовок X-Godox-Token. Сервер доступен только через 127.0.0.1; ключи Bluetooth по API не выдаются." TextWrapping="Wrap" Foreground="{StaticResource Muted}"/>
+     <TextBox x:Name="ApiExamples" IsReadOnly="True" FontFamily="Consolas" FontSize="13" TextWrapping="Wrap" Margin="0,18,0,0"/>
+    </StackPanel></ScrollViewer>
+   </TabItem>
+   <TabItem Header="Журнал"><TextBox x:Name="LogBox" IsReadOnly="True" FontFamily="Consolas" FontSize="13" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Margin="0,18,0,0"/></TabItem>
+  </TabControl>
+  <DockPanel Grid.Row="2" Margin="0,16,0,0"><ProgressBar x:Name="Progress" IsIndeterminate="True" Width="70" Height="4" Margin="0,0,12,0" Visibility="Collapsed"/>
+   <TextBlock x:Name="StatusBar" Text="Готово. Подключите светильники — затем двигайте ползунки." Foreground="{StaticResource Muted}" TextTrimming="CharacterEllipsis"/>
+  </DockPanel>
+ </Grid>
+</Window>

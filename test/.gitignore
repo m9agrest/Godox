@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+logs/
+*mesh_state*.json
+reference/
+*.lock

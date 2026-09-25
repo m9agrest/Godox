@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Godox.Desktop</AssemblyName>
+    <RootNamespace>Godox.Desktop</RootNamespace>
+    <Authors>m9agrest</Authors>
+    <Copyright>Copyright (c) 2026 m9agrest</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/m9agrest/Godox</RepositoryUrl>
+    <Version>0.1.0</Version>
+    <ApplicationIcon>../../assets/godox.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup><FrameworkReference Include="Microsoft.AspNetCore.App" /></ItemGroup>
+  <ItemGroup><Resource Include="../../assets/godox.ico" Link="Assets/godox.ico" /></ItemGroup>
+</Project>
